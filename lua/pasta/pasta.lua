@@ -35,6 +35,10 @@ function P.setup()
   -- create options with default values
   -- P.sign_highlights = require("pasta.config").sign_highlights
 
+    -- testing purposes
+  vim.api.nvim_create_user_command("Pasta", P.show_window, {})
+  vim.api.nvim_set_keymap("i", "<C-r>", "<cmd>Pasta<CR>", {})
+  vim.api.nvim_set_keymap("n", "£", ":Pasta<CR>", {})
   -- create namespace for highlighting and signs
   P._namespace = vim.api.nvim_create_namespace("registers")
 end
@@ -189,12 +193,12 @@ function P._create_window()
   })
 
   -- Register an autocommand to trigger events when the cursor moves
-  -- if type(registers.options.events.on_register_highlighted) == "function" then
-  -- 	registers._previous_cursor_line = nil
+  -- if type(P.events.on_register_highlighted) == "function" then
+  -- 	P._previous_cursor_line = nil
   -- 	vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
   -- 		group = group,
-  -- 		buffer = registers._buffer,
-  -- 		callback = registers._cursor_moved,
+  -- 		buffer = P._buffer,
+  -- 		callback = P._cursor_moved,
   -- 	})
   -- end
 
@@ -305,7 +309,6 @@ end
 
 ---`require("registers").show_window({...})`
 ---@class show_window_options
-
 ---Popup the registers window.
 function P.show_window()
   P._create_window()
@@ -418,9 +421,6 @@ function P._highlight_for_sign(register)
   })[register]
 end
 
-vim.api.nvim_create_user_command("Pasta", P.show_window, {})
-vim.api.nvim_set_keymap("i", "<C-r>", "<cmd>Pasta<CR>", {})
-vim.api.nvim_set_keymap("n", "£", ":Pasta<CR>", {})
 -- P.show_window()
 -- P._read_registers()
 -- vim.api.nvim_set_keymap("n", "r", "", { callback = P.show_window({}), noremap = true, expr = true })
