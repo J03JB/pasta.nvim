@@ -8,7 +8,7 @@
 ---@field private _preview_window? integer
 local P = {}
 
----@alias pasta_mode
+---@alias _mode
 ---| '"insert"' # Insert the register's contents like when in insert mode and pressing <C-R>.
 ---| '"paste"' # Insert the register's contents by pretending a pasting action, similar to pressing "*reg*p, cannot be used in insert mode.
 ---| '"motion"' # Create a motion from the register, similar to pressing "*reg* (without pasting it yet).
@@ -309,6 +309,7 @@ end
 
 ---`require("registers").show_window({...})`
 ---@class show_window_options
+
 ---Popup the registers window.
 function P.show_window()
   P._create_window()

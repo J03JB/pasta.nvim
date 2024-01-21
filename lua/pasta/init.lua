@@ -1,5 +1,4 @@
 ---@tag pasta.nvim
-
 ---@brief [[
 ---
 ---@brief ]]
@@ -12,5 +11,4 @@
 ---@field setup function: setup the plugin
 ---@field main function: calculate the max or min of two numbers and round the result if specified by options
 
-require("pasta")
-
+require('pasta.pasta').setup()
