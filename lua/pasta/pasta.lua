@@ -426,4 +426,5 @@ end
 -- vim.api.nvim_set_keymap("n", "r", "", { callback = P.show_window({}), noremap = true, expr = true })
 -- vim.api.nvim_set_keymap("i", "<C-u>", "", { callback = P.show_window(), noremap = true, expr = true })
 
+P.setup()
 return P
