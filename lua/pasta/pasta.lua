@@ -6,12 +6,28 @@
 ---@field private _buffer? integer
 ---@field private _preview_buffer? integer
 ---@field private _preview_window? integer
+---@field private _previous_mode string
 local P = {}
 
----@alias _mode
+---@alias P_mode
 ---| '"insert"' # Insert the register's contents like when in insert mode and pressing <C-R>.
 ---| '"paste"' # Insert the register's contents by pretending a pasting action, similar to pressing "*reg*p, cannot be used in insert mode.
 ---| '"motion"' # Create a motion from the register, similar to pressing "*reg* (without pasting it yet).
+
+---@class sign_highlights_options
+---@field cursorline? string Highlight group for when the cursor is over the line. Default is `"Visual"`.
+---@field selection? string Highlight group for the selection registers, `*+`. Default is `"Constant"`.
+---@field default? string Highlight group for the default register, `"`. Default is `"Function"`.
+---@field unnamed? string Highlight group for the unnamed register, `\\`. Default is `"Statement"`.
+---@field read_only? string Highlight group for the read only registers, `:.%`. Default is `"Type"`.
+---@field alternate_buffer? string Highlight group for the alternate buffer register, `#`. Default is `"Type"`.
+---@field expression? string Highlight group for the expression register, `=`. Default is `"Exception"`.
+---@field black_hole? string Highlight group for the black hole register, `_`. Default is `"Error"`.
+---@field last_search? string Highlight group for the last search register, `/`. Default is `"Operator"`.
+---@field delete? string Highlight group for the delete register, `-`. Default is `"Special"`.
+---@field yank? string Highlight group for the yank register, `0`. Default is `"Delimiter"`.
+---@field history? string Highlight group for the history registers, `1-9`. Default is `"Number"`.
+---@field named? string Highlight group for the named registers, `a-z`. Default is `"Todo"`.
 
 P.sign_highlights = {
   cursorlinesign = "CursorLine",
@@ -35,8 +51,8 @@ function P.setup()
   -- create options with default values
   -- P.sign_highlights = require("pasta.config").sign_highlights
 
-    -- testing purposes
-  vim.api.nvim_create_user_command("Pasta", P.show_window, {})
+  -- testing purposes
+  vim.api.nvim_create_user_command("Pasta", P.show_window({"paste"}), {})
   vim.api.nvim_set_keymap("i", "<C-r>", "<cmd>Pasta<CR>", {})
   vim.api.nvim_set_keymap("n", "£", ":Pasta<CR>", {})
   -- create namespace for highlighting and signs
@@ -192,7 +208,7 @@ function P._create_window()
     callback = P._close_window,
   })
 
-  -- Register an autocommand to trigger events when the cursor moves
+  -- -- Register an autocommand to trigger events when the cursor moves
   -- if type(P.events.on_register_highlighted) == "function" then
   -- 	P._previous_cursor_line = nil
   -- 	vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
@@ -220,23 +236,13 @@ function P._create_window()
   -- Apply the key bindings to the buffer
   -- P._set_bindings()
 
-  -- -- Stop when the window is interrupted/
-  -- if registers._is_interrupted() then
-  -- 	registers._close_window()
-  -- 	return
-  -- end
-
-  -- -- The creation of the window can't be interrupted at this point because the keys are already bound
-  -- registers._key_interrupt_timer:close()
-  -- registers._key_interrupt_timer = nil
-
   -- Ensure the window shows up
   vim.cmd("redraw!")
 
   -- -- Put the window in normal mode when using a visual selection
-  -- if registers._previous_mode_is_visual() then
-  -- 	vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-N>", true, true, true), "n", true)
-  -- end
+  if P._previous_mode_is_visual() then
+  	vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-N>", true, true, true), "n", true)
+  end
 end
 
 ---@private
@@ -249,7 +255,6 @@ function P._define_highlights()
   vim.api.nvim_win_set_hl_ns(P._window, namespace)
 
   -- Define the matches and link them
-  -- vim.cmd([[syntax match RegistersNumber "\d\+"]])
   vim.cmd([[syntax match RegistersNumber "[-+]\?\d\+\.\?\d*"]])
   vim.api.nvim_set_hl(namespace, "RegistersNumber", { link = "Number" })
 
@@ -270,7 +275,6 @@ function P._define_highlights()
   vim.cmd([[syntax match RegistersWhitespace "\%u00B7"]])
   vim.cmd([[syntax match RegistersWhitespace " "]])
   vim.api.nvim_set_hl(namespace, "RegistersWhitespace", { link = "Comment" })
-
   vim.cmd([[syntax match RegistersEscaped "\\\w"]])
   vim.cmd([[syntax keyword RegistersEscaped \.]])
   vim.api.nvim_set_hl(namespace, "RegistersEscaped", { link = "Special" })
@@ -307,12 +311,27 @@ function P._define_highlights()
   vim.cmd([[syntax region RegistersEmpty start="^Empty: " end="$" contains=RegistersSymbol.*,RegistersEmptyString]])
 end
 
+---@mod callbacks Bindable functions
+
 ---`require("registers").show_window({...})`
 ---@class show_window_options
+---@field mode? P_mode How the registers window should handle the selection of registers. Default is `"motion"`.
 
 ---Popup the registers window.
-function P.show_window()
-  P._create_window()
+---@param options? show_window_options Options for firing the callback.
+---@return function callback Function that can be used to pass to configuration options with callbacks.
+function P.show_window(options)
+  options = vim.tbl_deep_extend("keep", options or {}, {
+    mode = "motion",
+  })
+  return function()
+
+
+    -- Mode before opening the popup window
+    P._previous_mode = vim.api.nvim_get_mode().mode
+    P._mode = options.mode
+    P._create_window()
+  end
 end
 
 ---@private
@@ -348,11 +367,32 @@ function P._handle_callback_options(options, cb)
 end
 
 ---@private
+-- Close the window.
 function P._close_window()
   if P._window then
     vim.api.nvim_win_close(P._window, true)
     P._window = nil
   end
+  -- clear the namespace
+  if P._preview_buffer then
+    vim.api.nvim_buf_clear_namespace(P._preview_buffer, P._namespace, 0, -1)
+  end
+end
+
+
+---@private
+---Handle the CursorMoved autocmd.
+function P._cursor_moved()
+  local cursor = unpack(vim.api.nvim_win_get_cursor(P._window))
+
+  -- Skip horizontal movement
+  if P._previous_cursor_line == cursor then
+    return
+  end
+  P._previous_cursor_line = cursor
+
+  -- Trigger the highlight change event
+  -- P.options.events.on_register_highlighted()
 end
 
 ---Close the window.
@@ -360,6 +400,143 @@ end
 ---@return function callback Function that can be used to pass to configuration options with callbacks.
 function P.close_window(options)
   return P._handle_callback_options(options, P._close_window)
+end
+
+---@class apply_register_options
+---@field mode? P_mode How the register should be applied. If `nil` then the mode in which the window is opened is used.
+---@field keep_open_until_keypress? boolean If `true`, keep the window open until another key is pressed, only applicable when the mode is `"motion"`.
+
+---Apply the specified register.
+---@param options? callback_options Options for firing the callback.
+---@return function callback Function that can be used to pass to configuration options with callbacks.
+---@usage [[
+---require("registers").setup({
+---    bind_keys = {
+---        -- Always paste the register when selecting with Enter
+---        ["<CR>"] = require("registers").apply_register({ mode = "paste" }),
+---    }
+---})
+---
+---require("registers").setup({
+---    bind_keys = {
+---        -- When pressing a key of the register, wait for another key press before closing the window
+---        registers = require("registers").apply_register({ keep_open_until_keypress = true }),
+---    }
+---})
+---@usage ]]
+function P.apply_register(options)
+  return P._handle_callback_options(options --[[@as callback_options]], function(register, mode)
+    -- When the current line needs to be selected a window also needs to be open
+    if register == nil and P._window == nil then
+      vim.api.nvim_err_writeln("registers window isn't open, can't apply register")
+      return
+    end
+
+    -- Overwrite the mode
+    if options and options.mode then
+      P._mode = options.mode --[[@as P_mode]]
+    elseif mode then
+      P._mode = mode
+    end
+
+    P._apply_register(register, options)
+  end)
+end
+
+function P._apply_register(register)
+  register = P._register_symbol(register)
+
+  if not register then
+    return
+  end
+
+  local action
+  if P._mode == "paste" then
+    action = "p"
+  elseif P._mode == "motion" then
+    action = vim.fn.getcharstr()
+  end
+
+  P._close_window()
+
+  if P._mode == "insert" then
+    local key = vim.api.nvim_replace_termcodes("<C-R>", true, true, true)
+    if register == "=" then
+      vim.api.nvim_feedkeys(key .. "=", "n", true)
+    else
+      -- Insert the other keys
+
+      -- Capture the contents of the "=" register so it can be reset later
+      local old_expr_content = vim.fn.getreg("=", 1)
+
+      -- <CR> key
+      local submit = vim.api.nvim_replace_termcodes("<CR>", true, true, true)
+
+      -- Execute the selected register content using "=" register and insert the result
+      vim.api.nvim_feedkeys(key .. "=@" .. register .. submit, "n", true)
+
+      -- Recover the "=" register with a delay otherwise it doesn't get applied
+      vim.schedule(function()
+        vim.fn.setreg("=", old_expr_content)
+      end)
+    end
+  elseif P._previous_mode == "n" or P._previous_mode_is_visual() then
+    -- Simulate the keypresses require to perform the next actions
+    vim.schedule(function()
+      local keys = ""
+
+      -- Go to previous visual selection if applicable
+      if P._previous_mode_is_visual() then
+        keys = keys .. "gv"
+      end
+
+      -- Select the register if applicable
+      if P._mode == "motion" or P._mode == "paste" then
+        -- Push the operator count back if applicable
+        if P._operator_count > 0 then
+          keys = keys .. P._operator_count
+        end
+
+        keys = keys .. '"' .. register
+      end
+
+      -- Handle the key that might needs to be pressed
+      if action then
+        keys = keys .. action
+      end
+
+      vim.api.nvim_feedkeys(keys, "n", true)
+    end)
+  end
+end
+
+---@private
+---Whether the previous mode is any of the visual selections.
+---@return boolean is_visual Whether the previous mode is a visual selection.
+function P._previous_mode_is_visual()
+  return P._previous_mode == "v" or P._previous_mode == "^V" or P._previous_mode == "V" or P._previous_mode == "\22"
+end
+
+---@private
+---Get the register or when it's `nil` the selected register from the cursor.
+---@param register? string Register to look up, if nothing is passed the current line will be used
+---@return? string The register or the current line, if applicable
+---@nodiscard
+function P._register_symbol(register)
+  if register == nil then
+    -- A register is selected by the cursor, get it based on the current line
+    local cursor = unpack(vim.api.nvim_win_get_cursor(P._window))
+
+    if #P._register_values < cursor then
+      -- The empty section has been chosen, it doesn't select anything
+      return nil
+    end
+
+    return P._register_values[cursor].register
+  else
+    -- Use the already set value
+    return register
+  end
 end
 
 ---@private
@@ -428,4 +605,5 @@ end
 -- vim.api.nvim_set_keymap("i", "<C-u>", "", { callback = P.show_window(), noremap = true, expr = true })
 
 P.setup()
+P.show_window({mode = "paste"})
 return P
