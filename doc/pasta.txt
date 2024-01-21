@@ -1,0 +1,57 @@
+================================================================================
+NVIM                                                                *pasta.nvim*
+
+
+
+
+================================================================================
+P.sign_highlights()                                      *P.sign_highlights()*
+    | '"insert"' # Insert the register's contents like when in insert mode and
+    pressing <C-R>. | '"paste"' # Insert the register's contents by pretending
+    a pasting action, similar to pressing "*reg*p, cannot be used in insert
+    mode. | '"motion"' # Create a motion from the register, similar to pressing
+    "*reg* (without pasting it yet).
+
+
+
+P._fill_window()                                            *P._fill_window()*
+    Fill the window's buffer.
+
+
+
+P._create_window()                                        *P._create_window()*
+    Create the window and the buffer.
+
+
+
+P._define_highlights()                                *P._define_highlights()*
+    Register the highlights.
+
+
+
+P.show_window()                                              *P.show_window()*
+    `require("registers").show_window({...})`
+
+
+
+to trigger.
+---@return function callback Wrapped callback function applying the options.
+---@nodiscard
+function P._handle_callback_options() *to trigger.
+---@return function callback Wrapped callback function applying the options.
+---@nodiscard
+function P._handle_callback_options()*
+    Handle the calling of the callback function based on the options, so things
+    like delays can be added.
+
+
+
+
+================================================================================
+Defaults:get()                                                *Defaults:get()*
+    `require("registers").setup({...})`
+
+
+
+
+ vim:tw=78:ts=8:ft=help:norl:
