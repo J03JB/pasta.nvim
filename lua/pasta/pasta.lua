@@ -9,6 +9,21 @@
 ---@field private _previous_mode string
 local P = {}
 
+---@class bind_keys_options
+---@field normal fun()|false Function to map to " in normal mode to display the registers window, `false` to disable the binding. Default is `registers.show_window({ mode = "motion" })`.
+---@field visual fun()|false Function to map to " in visual mode to display the registers window, `false` to disable the binding. Default is `registers.show_window({ mode = "motion" })`.
+---@field insert fun()|false Function to map to <C-R> in insert mode to display the registers window, `false` to disable the binding. Default is `registers.show_window({ mode = "insert" })`.
+---@field registers fun(register:string,mode:P_mode) Function to map to the register selected by pressing it's key. Default is `registers.apply_register()`.
+---@field [string] fun()|false Function to map to the custom key binding in the registers window.
+---@field return_key fun(register:string,mode:P_mode) Deprecated, function to map to <CR> in the registers window. Default is `registers.apply_register()`.
+---@field escape fun(register:string,mode:P_mode) Deprecated, function to map to <ESC> in the registers window. Default is `registers.close_window()`.
+---@field ctrl_n fun()|false Deprecated, function to map <C-N> in the registers window. Default is `registers.move_cursor_down()`.
+---@field ctrl_p fun()|false Deprecated, function to map <C-P> in the registers window. Default is `registers.move_cursor_up()`.
+---@field ctrl_j fun()|false Deprecated, function to map <C-J> in the registers window. Default is `registers.move_cursor_down()`.
+---@field ctrl_k fun()|false Deprecated, function to map <C-K> in the registers window. Default is `registers.move_cursor_up()`.
+---@field delete fun()|false Deprecated, function to map <DEL> in the registers window. Default is `registers.clear_highlighted_register()`.
+---@field backspace fun()|false Deprecated, function to map <BS> in the registers window. Default is `registers.clear_highlighted_register()`.
+
 ---@alias P_mode
 ---| '"insert"' # Insert the register's contents like when in insert mode and pressing <C-R>.
 ---| '"paste"' # Insert the register's contents by pretending a pasting action, similar to pressing "*reg*p, cannot be used in insert mode.
@@ -48,13 +63,14 @@ P.sign_highlights = {
 }
 ---@usage 'require("Pasta").setup({})'
 function P.setup()
-  -- create options with default values
-  -- P.sign_highlights = require("pasta.config").sign_highlights
 
-  -- testing purposes
-  vim.api.nvim_create_user_command("Pasta", P.show_window({"paste"}), {})
-  vim.api.nvim_set_keymap("i", "<C-r>", "<cmd>Pasta<CR>", {})
-  vim.api.nvim_set_keymap("n", "£", ":Pasta<CR>", {})
+  -- Pre-fill the key mappings
+  P._fill_mappings()
+
+  P._bind_global_key("normal", '"', "n")
+  P._bind_global_key("visual", '"', "x")
+  P._bind_global_key("insert", "<C-R>", "i")
+
   -- create namespace for highlighting and signs
   P._namespace = vim.api.nvim_create_namespace("registers")
 end
@@ -104,7 +120,10 @@ function P._read_registers()
         end
 
         register_info.line = line
-        register_info.register = register -- Add a register field
+
+        -- Add register field for sign_text in sign_highlights
+        register_info.register = register
+
         P._register_values[#P._register_values + 1] = register_info
       end
     else
@@ -130,7 +149,8 @@ function P._fill_window()
 
     lines[i] = register.line
   end
-
+    -- Add the empty line
+    -- lines[#lines + 1] = "Empty: " .. table.concat(P._empty_registers, " ")
   -- Write the lines to the buffer
   vim.api.nvim_buf_set_lines(P._buffer, 0, -1, false, lines)
 
@@ -196,6 +216,10 @@ function P._create_window()
     col = 0,
     -- How the edges are rendered
     border = "rounded",
+    title = "Pasta.nvim",
+    title_pos = "center",
+    footer = "Empty: " .. table.concat(P._empty_registers, " "),
+    footer_pos = "center",
   }
   -- Make the window active when the window is not a preview
   P._window = vim.api.nvim_open_win(P._buffer, true, window_options)
@@ -234,14 +258,14 @@ function P._create_window()
   P._fill_window()
 
   -- Apply the key bindings to the buffer
-  -- P._set_bindings()
+  P._set_bindings()
 
   -- Ensure the window shows up
   vim.cmd("redraw!")
 
   -- -- Put the window in normal mode when using a visual selection
   if P._previous_mode_is_visual() then
-  	vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-N>", true, true, true), "n", true)
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-N>", true, true, true), "n", true)
   end
 end
 
@@ -250,8 +274,8 @@ end
 function P._define_highlights()
   -- Set the namespace for the highlights on the window, if we're running an older neovim version make it global
   ---@type integer
-  local namespace = 0
-  -- local namespace = P._namespace
+  -- local namespace = 0
+  local namespace = P._namespace
   vim.api.nvim_win_set_hl_ns(P._window, namespace)
 
   -- Define the matches and link them
@@ -325,12 +349,12 @@ function P.show_window(options)
     mode = "motion",
   })
   return function()
-
-
     -- Mode before opening the popup window
     P._previous_mode = vim.api.nvim_get_mode().mode
     P._mode = options.mode
-    P._create_window()
+    vim.schedule(function()
+      P._create_window()
+    end)
   end
 end
 
@@ -341,8 +365,8 @@ end
 ---@return function callback Wrapped callback function applying the options.
 ---@nodiscard
 function P._handle_callback_options(options, cb)
-  -- Process the table arguments
   local if_mode = (options and options.if_mode) or { "paste", "insert", "motion" }
+  -- Process the table arguments
   -- Ensure it's always a table
   if type(if_mode) ~= "table" then
     if_mode = { if_mode }
@@ -379,7 +403,6 @@ function P._close_window()
   end
 end
 
-
 ---@private
 ---Handle the CursorMoved autocmd.
 function P._cursor_moved()
@@ -395,6 +418,9 @@ function P._cursor_moved()
   -- P.options.events.on_register_highlighted()
 end
 
+---@class callback_options
+---@field after? function Callback function that can be chained after the current one.
+---@field if_mode P_mode|[register_mode] Will only be triggered when the registers mode matches it. Default: `{ "paste", "insert", "motion" }`.
 ---Close the window.
 ---@param options? callback_options Options for firing the callback.
 ---@return function callback Function that can be used to pass to configuration options with callbacks.
@@ -404,7 +430,6 @@ end
 
 ---@class apply_register_options
 ---@field mode? P_mode How the register should be applied. If `nil` then the mode in which the window is opened is used.
----@field keep_open_until_keypress? boolean If `true`, keep the window open until another key is pressed, only applicable when the mode is `"motion"`.
 
 ---Apply the specified register.
 ---@param options? callback_options Options for firing the callback.
@@ -493,9 +518,9 @@ function P._apply_register(register)
       -- Select the register if applicable
       if P._mode == "motion" or P._mode == "paste" then
         -- Push the operator count back if applicable
-        if P._operator_count > 0 then
-          keys = keys .. P._operator_count
-        end
+        -- if P._operator_count > 0 then
+        --   keys = keys .. P._operator_count
+        -- end
 
         keys = keys .. '"' .. register
       end
@@ -599,11 +624,221 @@ function P._highlight_for_sign(register)
   })[register]
 end
 
--- P.show_window()
--- P._read_registers()
--- vim.api.nvim_set_keymap("n", "r", "", { callback = P.show_window({}), noremap = true, expr = true })
--- vim.api.nvim_set_keymap("i", "<C-u>", "", { callback = P.show_window(), noremap = true, expr = true })
+P.bind_keys = {
+  -- Show the window when pressing " in normal mode, applying the selected register as part of a motion, which is the default behavior of Neovim
+  normal = P.show_window({ mode = "motion" }),
+  -- Show the window when pressing " in visual mode, applying the selected register as part of a motion, which is the default behavior of Neovim
+  visual = P.show_window({ mode = "motion" }),
+  -- Show the window when pressing <C-R> in insert mode, inserting the selected register, which is the default behavior of Neovim
+  insert = P.show_window({ mode = "insert" }),
 
-P.setup()
-P.show_window({mode = "paste"})
+  -- When pressing the key of a register, apply it with a very small delay, which will also highlight the selected register
+  -- registers = P.apply_register({ delay = 0.1 }),
+  -- Immediately apply the selected register line when pressing the return key
+  ["<CR>"] = P.apply_register(),
+  -- Close the registers window when pressing the Esc key
+  ["<Esc>"] = P.close_window(),
+
+  -- -- Move the cursor in the registers window down when pressing <C-n>
+  -- ["<C-n>"] = P.move_cursor_down(),
+  -- -- Move the cursor in the registers window up when pressing <C-p>
+  -- ["<C-p>"] = P.move_cursor_up(),
+  -- -- Move the cursor in the registers window down when pressing <C-j>
+  -- ["<C-j>"] = P.move_cursor_down(),
+  -- -- Move the cursor in the registers window up when pressing <C-k>
+  -- ["<C-k>"] = P.move_cursor_up(),
+  -- -- Clear the register of the highlighted line when pressing <DeL>
+  -- ["<Del>"] = P.clear_highlighted_register(),
+  -- -- Clear the register of the highlighted line when pressing <BS>
+  -- ["<BS>"]  = P.clear_highlighted_register(),
+}
+
+---@private
+---Pre-fill the key mappings.
+function P._fill_mappings()
+  --  Don't map the keys when `false` is passed to bind_keys
+  if not P.bind_keys then
+    return
+  end
+
+  -- Add the other user-defined keys to the map
+  local reserved_keys = {
+    normal = true,
+    visual = true,
+    insert = true,
+    registers = true,
+    return_key = true,
+    escape = true,
+    ctrl_n = true,
+    ctrl_p = true,
+    ctrl_j = true,
+    ctrl_k = true,
+    delete = true,
+    backspace = true,
+  }
+
+  -- Create the mappings to call the function specified in the options
+  P._mappings = {}
+  for key, func in pairs(P.bind_keys) do
+    -- Don't bind the reserved keys, that doesn't make any sense
+    if not reserved_keys[key] then
+      P._mappings[key] = function()
+        func(nil, P._mode)
+      end
+    end
+  end
+
+  -- Create mappings for the register keys
+  for _, register in ipairs(P._all_registers) do
+    -- Pressing the character of a register will also apply it
+    P._mappings[register] = function()
+      -- Always move the cursor to the selected line in case there's a delay, unfortunately there's no way to know if that's the case at this time so it's quite inefficient when there's no delay
+      P._move_cursor_to_register(register)
+
+      -- Apply the mapping
+      P.bind_keys.registers(register, P._mode)
+    end
+
+    -- Also map uppercase registers if applicable
+    if register:upper() ~= register then
+      P._mappings[register:upper()] = function()
+        -- Always move the cursor to the selected line in case there's a delay, unfortunately there's no way to know if that's the case at this time so it's quite inefficient when there's no delay
+        P._move_cursor_to_register(register)
+
+        -- Apply the mapping
+        P.bind_keys.registers(register:upper(), P._mode)
+      end
+    end
+  end
+end
+
+---@private
+---Set the key bindings for the window.
+function P._set_bindings()
+  -- Helper function for setting the keymap for all buffer modes
+  local set_keymap_all_modes = function(key, callback)
+    local map_options = {
+      nowait = true,
+      noremap = true,
+      silent = true,
+      callback = callback,
+    }
+
+    vim.api.nvim_buf_set_keymap(P._buffer, "n", key, "", map_options)
+    vim.api.nvim_buf_set_keymap(P._buffer, "i", key, "", map_options)
+    vim.api.nvim_buf_set_keymap(P._buffer, "x", key, "", map_options)
+  end
+
+  -- Map all register keys
+  if P._key_should_be_bound("registers") then
+    for key, callback in pairs(P._mappings) do
+      set_keymap_all_modes(key, callback)
+    end
+  end
+
+  -- -- Map the keys for moving up and down
+  -- if P._key_should_be_bound("ctrl_k") then
+  --     set_keymap_all_modes("<c-k>", P.options.bind_keys.ctrl_k)
+  -- end
+  -- if P._key_should_be_bound("ctrl_j") then
+  --     set_keymap_all_modes("<c-j>", P.options.bind_keys.ctrl_j)
+  -- end
+  -- if P._key_should_be_bound("ctrl_p") then
+  --     set_keymap_all_modes("<c-p>", P.options.bind_keys.ctrl_p)
+  -- end
+  -- if P._key_should_be_bound("ctrl_n") then
+  --     set_keymap_all_modes("<c-n>", P.options.bind_keys.ctrl_n)
+  -- end
+end
+
+---@private
+---Whether a key should be bound.
+---@param option string Which item from bind_keys should be checked
+---@return boolean Whether the key should be bound
+---@nodiscard
+function P._key_should_be_bound(option)
+  if type(P.bind_keys) == "boolean" then
+        vim.print(P.bind_keys)
+    return P.bind_keys --[[@as boolean]]
+  else
+    return P.bind_keys[option]
+  end
+end
+
+---@private
+---Create a map for global key binding with a callback function.
+---@param index string Key of the function in the `bind_keys` table.
+---@param key string Which key to press.
+---@param mode P_mode Which mode to register the key.
+function P._bind_global_key(index, key, mode)
+  if P._key_should_be_bound(index) then
+    vim.api.nvim_set_keymap(mode, key, "", {
+      callback = function()
+        -- Don't open the registers window in a telescope prompt or in a non-modifiable buffer
+        if not vim.bo.modifiable or vim.bo.filetype == "TelescopePrompt" or vim.bo.filetype == "DressingInput" then
+          return vim.api.nvim_replace_termcodes(key, true, true, true)
+        else
+          -- Call the callback function passed to the options
+                    vim.print(P.bind_keys[index])
+          return P.bind_keys[index]()
+        end
+      end,
+      expr = true,
+    })
+  end
+end
+
+---@private
+---All available registers.
+P._all_registers = {
+  "*",
+  "+",
+  '"',
+  "-",
+  "/",
+  "_",
+  "=",
+  "#",
+  "%",
+  ".",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "h",
+  "i",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "p",
+  "q",
+  "r",
+  "s",
+  "t",
+  "u",
+  "v",
+  "w",
+  "x",
+  "y",
+  "z",
+  ":",
+}
+
+-- P.show_window{mode = "paste"})
 return P
