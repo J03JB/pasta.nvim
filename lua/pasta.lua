@@ -65,7 +65,6 @@ P.sign_highlights = {
 function P.setup()
     vim.api.nvim_create_user_command("Pasta", P.show_window({ mode = "paste" }), {})
     -- Pre-fill the key mappings
-    -- THESE DONT WORK
     P._fill_mappings()
 
     -- these work!!
