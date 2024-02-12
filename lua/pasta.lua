@@ -1,10 +1,9 @@
 ---@class P
 ---@field private _register_values { regcontents: string, line: string, register: string, type_symbol?: string, regtype: string }[]
---@field private _namespace string
 ---@field private _empty_registers string[]
 ---@field private _window? integer
 ---@field private _buffer? integer
----@field private _preview_buffer? integer
+---@field private _preview_buffer integer
 ---@field private _preview_window? integer
 ---@field private _previous_mode string
 local P = {}
@@ -63,11 +62,12 @@ P.sign_highlights = {
 }
 ---@usage 'require("Pasta").setup({})'
 function P.setup()
+    -- register ":Pasta" user command
     vim.api.nvim_create_user_command("Pasta", P.show_window({ mode = "paste" }), {})
+
     -- Pre-fill the key mappings
     P._fill_mappings()
 
-    -- these work!!
     P._bind_global_key("normal", '"', "n")
     P._bind_global_key("visual", '"', "x")
     P._bind_global_key("insert", "<C-R>", "i")
@@ -130,7 +130,7 @@ function P._read_registers()
                 -- Place it in the empty registers
                 P._empty_registers[#P._empty_registers + 1] = register
             elseif line and type(line) == "string" then
-                -- Trim the whitespace if applicable
+                -- Trim the whitespace
                 line = line:match("^%s*(.-)%s*$")
 
                 line = line
@@ -183,8 +183,6 @@ function P._fill_window()
 
         lines[i] = register.line
     end
-    -- Add the empty line
-    -- lines[#lines + 1] = "Empty: " .. table.concat(P._empty_registers, " ")
     -- Write the lines to the buffer
     vim.api.nvim_buf_set_lines(P._buffer, 0, -1, false, lines)
 
@@ -194,7 +192,7 @@ function P._fill_window()
         local sign_text = register.register
 
         -- add type symbol to sign_text
-        sign_text = sign_text .. register.type_symbol
+        -- sign_text = sign_text .. register.type_symbol
 
         local ns = vim.api.nvim_create_namespace("registers")
         -- Create signs for the register itself, and highlight the line
@@ -206,8 +204,8 @@ function P._fill_window()
         })
     end
 
-    -- Don't allow the buffer to be modified
-    vim.bo[P._buffer].modifiable = true
+    -- allow the buffer to be modified
+    vim.bo[P._buffer].modifiable = false
 end
 
 ---@private
@@ -259,15 +257,12 @@ function P._create_window()
         callback = P._close_window,
     })
 
-    -- -- Register an autocommand to trigger events when the cursor moves
-    -- if type(P.events.on_register_highlighted) == "function" then
-    -- 	P._previous_cursor_line = nil
-    -- 	vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
-    -- 		group = group,
-    -- 		buffer = P._buffer,
-    -- 		callback = P._cursor_moved,
-    -- 	})
-    -- end
+    -- Register an autocommand to trigger events when the cursor moves
+    vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+        group = group,
+        buffer = P._buffer,
+        callback = P._cursor_moved,
+    })
 
     -- Make the buffer content cut-off instead of starting on new line
     vim.wo[P._window].wrap = false
@@ -377,8 +372,8 @@ function P.show_window(options)
         -- Mode before opening the popup window
         P._previous_mode = vim.api.nvim_get_mode().mode
         P._mode = options.mode
-        vim.print("pmode: " .. P._mode)
-        vim.print("options: " .. options.mode)
+        -- vim.print("pmode: " .. P._mode)
+        -- vim.print("options: " .. options.mode)
         vim.schedule(function()
             P._create_window()
         end)
@@ -397,7 +392,6 @@ function P._close_window()
         vim.api.nvim_buf_clear_namespace(P._preview_buffer, P._namespace, 0, -1)
     end
 end
-
 ---@private
 ---Handle the CursorMoved autocmd.
 function P._cursor_moved()
@@ -533,7 +527,6 @@ function P.apply_register(options)
             print("mode overwritten to " .. P._mode)
         elseif mode then
             P._mode = mode
-            print(P._mode)
         end
 
         P._apply_register(register, options and options.keep_open_until_keypress)
@@ -542,7 +535,6 @@ end
 
 function P._apply_register(register, keep_open_until_keypress)
     register = P._register_symbol(register)
-    print(vim.inspect(register))
     if not register then
         return
     end
@@ -601,8 +593,6 @@ function P._apply_register(register, keep_open_until_keypress)
             -- Handle the key that might needs to be pressed
             if action then
                 keys = keys .. action
-                vim.inspect(keys)
-                vim.inspect(action)
             end
 
             vim.api.nvim_feedkeys(keys, "n", true)
@@ -630,12 +620,45 @@ function P._register_symbol(register)
             return nil
         end
 
+        print(P._register_values[cursor].register)
+
         return P._register_values[cursor].register
     else
         -- Use the already set value
         return register
     end
 end
+
+
+-- TODO: Function to display register under cursor as vitual text,
+--       use P._register_symbol to get the register?? should work.
+--  need to use cursor from original buffer not, Register namespace
+-- function P.ghost_text()
+--     -- local bnr = vim.api.nvim_get_current_buf()
+--     local namespace = vim.api.nvim_create_namespace('Registers:text')
+
+--     local function set_extmark(namespace, line, chunk)
+--         local buffer = P._preview_buffer
+--         local col  = 0
+--         local options = {
+--             virt_text = { chunk },
+--             virt_text_pos = 'eol',
+--         }
+
+--         return vim.api.nvim_buf_set_extmark(buffer, namespace, line, col, options)
+--     end
+
+--     local register = P._register_symbol()
+
+--     local cursor = vim.api.nvim_win_get_cursor(0)
+--     local line = cursor[1]
+
+--     set_extmark(namespace, line, { P._register_symbol(register), "Comment"})
+
+
+-- end
+
+
 
 ---@private
 ---The highlight group from the options for the sign.
@@ -731,7 +754,7 @@ P.bind_keys = {
 function P._fill_mappings()
     --  Don't map the keys when `false` is passed to bind_keys
     if not P.bind_keys then
-        vim.inspect(P.bind_keys)
+        -- vim.inspect(P.bind_keys)
         return
     end
 
