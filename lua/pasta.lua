@@ -410,26 +410,30 @@ function P._cursor_moved()
 end
 
 function P.show_virtual_text()
-    -- local cursor = unpack(vim.api.nvim_win_get_cursor(P._window))
-    local cursor = vim.api.nvim_win_get_cursor(P._window)
-
     local register_info = P._register_info()
-    local reg_text = vim.fn.string(register_info.regcontents)
-    -- local reg_text =  register_info.regcontents.text
+    -- Do nothing when an invalid line is selected
+    if type(register_info) ~= "table" then
+        return
+    end
 
     local reg_text = vim.inspect(register_info.regcontents)
-    -- local vtext_string = register_info.regcontents
 
     local virt_text = { {reg_text, "Comment"} }
-    print(vim.inspect(virt_text))
+    -- print(vim.inspect(virt_text))
 
+    -- Clear the previous extmarks
+    vim.api.nvim_buf_clear_namespace(P._preview_buffer, P._namespace, 0, -1)
 
-    vim.api.nvim_buf_set_extmark(P._preview_buffer, P._namespace, cursor[1]-1, 0, {
+    -- Get the cursor position of the main buffer
+    local line, col = unpack(vim.api.nvim_win_get_cursor(P._preview_window))
+
+    vim.api.nvim_buf_set_extmark(P._preview_buffer, P._namespace, line - 1 , col, {
         virt_text = virt_text,
-        virt_text_pos = "overlay",
+        virt_text_pos = "inline",
     })
 
 end
+
 ---@private
 ---Get the register information matching the register.
 ---@param register? string Register to look up, if nothing is passed the current line will be used
