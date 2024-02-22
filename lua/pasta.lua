@@ -416,9 +416,18 @@ function P.show_virtual_text()
         return
     end
 
-    local reg_text = vim.inspect(register_info.regcontents)
+    local reg_text = register_info.regcontents
 
-    local virt_text = { {reg_text, "Comment"} }
+    -- Add the highlight to the lines
+    local lines = {}
+    for i, line in ipairs(reg_text) do
+        lines[i] = {
+            line, "Comment"
+        }
+        vim.inspect(lines)
+    end
+
+    -- local virt_text = { {reg_text, "Comment"} }
     -- print(vim.inspect(virt_text))
 
     -- Clear the previous extmarks
@@ -428,7 +437,7 @@ function P.show_virtual_text()
     local line, col = unpack(vim.api.nvim_win_get_cursor(P._preview_window))
 
     vim.api.nvim_buf_set_extmark(P._preview_buffer, P._namespace, line - 1 , col, {
-        virt_text = virt_text,
+        virt_text = lines,
         virt_text_pos = "inline",
     })
 
@@ -455,46 +464,6 @@ function P._register_info(register)
 
     return nil
 end
-
----Show a preview of the highlighted register in the target buffer.
----Currently this overlays the text, waiting for https://github.com/neovim/neovim/pull/9496 to merge.
---@param options callback_options Options for firing the callback.
---@return function callback Function that can be used to pass to configuration options with callbacks.
--- function P.preview_highlighted_register(options)
---     return P._handle_callback_options(options --[[@as callback_options]], function()
---         -- Get the register contents for the current line as a table
---         local register_info = P._register_info()
-
---         -- Do nothing when an invalid line is selected
---         if type(register_info) ~= "table" then
---             return
---         end
-
---         local register_lines = register_info.regcontents
-
---         -- Add the highlight to the lines
---         local lines = {}
---         for i, line in ipairs(register_lines) do
---             lines[i] = {
---                 line, "Normal"
---             }
---             vim.inspect(lines)
---         end
-
---         -- Clear the previous extmarks
---         vim.api.nvim_buf_clear_namespace(P._preview_buffer, P._namespace, 0, -1)
-
---         -- Get the cursor position of the main buffer
---         local line, col = unpack(vim.api.nvim_win_get_cursor(P._preview_window))
-
---         -- Display the register content
---         vim.api.nvim_buf_set_extmark(P._preview_buffer, P._namespace, line - 1, col, {
---             virt_text = lines,
---             virt_text_win_col = col,
---             virt_text_pos = "inline",
---         })
---     end)
--- end
 
 ---@class callback_options
 ---@field after? function Callback function that can be chained after the current one.
@@ -624,45 +593,12 @@ function P._register_symbol(register)
             return nil
         end
 
-        print(P._register_values[cursor].register)
-
         return P._register_values[cursor].register
     else
         -- Use the already set value
         return register
     end
 end
-
-
--- TODO: Function to display register under cursor as vitual text,
---       use P._register_symbol to get the register?? should work.
---  need to use cursor from original buffer not, Register namespace
--- function P.ghost_text()
---     -- local bnr = vim.api.nvim_get_current_buf()
---     local namespace = vim.api.nvim_create_namespace('Registers:text')
-
---     local function set_extmark(namespace, line, chunk)
---         local buffer = P._preview_buffer
---         local col  = 0
---         local options = {
---             virt_text = { chunk },
---             virt_text_pos = 'eol',
---         }
-
---         return vim.api.nvim_buf_set_extmark(buffer, namespace, line, col, options)
---     end
-
---     local register = P._register_symbol()
-
---     local cursor = vim.api.nvim_win_get_cursor(0)
---     local line = cursor[1]
-
---     set_extmark(namespace, line, { P._register_symbol(register), "Comment"})
-
-
--- end
-
-
 
 ---@private
 ---The highlight group from the options for the sign.
@@ -738,6 +674,10 @@ P.bind_keys = {
     ["<CR>"] = P.apply_register(),
     -- Close the registers window when pressing the Esc key
     ["<Esc>"] = P.close_window(),
+
+
+    -- move up in buffer
+    --         vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Up>", true, true, true), "n", true)
 
     -- -- Move the cursor in the registers window down when pressing <C-n>
     -- ["<C-n>"] = P.move_cursor_down(),
