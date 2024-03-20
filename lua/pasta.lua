@@ -421,21 +421,19 @@ function P.show_virtual_text()
     local reg_text = register_info.regcontents
 
     -- Add the highlight to the lines
-    -- TODO: clean up this for loop
-    local new_lines = {}
     local lines = {}
     for i, line in ipairs(reg_text) do
-        lines[i] = { line }
-        new_lines[i] = line
-        vim.inspect(lines)
+        lines[i] = line
     end
 
+    -- Set virtual text
     local virt_text = {}
-    table.insert(virt_text, { new_lines[1], "Comment" })
+    table.insert(virt_text, { lines[1], "Comment" })
 
+    -- Set multi-line virtual text
     local virt_lines = {}
-    for i = 2, #new_lines do
-        table.insert(virt_lines, { { new_lines[i], "Comment" } })
+    for i = 2, #lines do
+        table.insert(virt_lines, { { lines[i], "Comment" } })
     end
 
     -- Clear the previous extmarks
