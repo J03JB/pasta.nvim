@@ -231,10 +231,12 @@ function P._create_window()
     local window_height = #P._register_values
 
     -- Create the floating window
+    -- TODO: window covers the virtual text atm! (fix me)
     local window_options = {
         relative = "cursor",
         style = "minimal",
         anchor = "NW",
+        hide = true,
         -- width = window_width,
         width = 100,
         height = window_height,
@@ -419,16 +421,22 @@ function P.show_virtual_text()
     local reg_text = register_info.regcontents
 
     -- Add the highlight to the lines
+    -- TODO: clean up this for loop
+    local new_lines = {}
     local lines = {}
     for i, line in ipairs(reg_text) do
-        lines[i] = {
-            line, "Comment"
-        }
+        lines[i] = { line }
+        new_lines[i] = line
         vim.inspect(lines)
     end
 
-    -- local virt_text = { {reg_text, "Comment"} }
-    -- print(vim.inspect(virt_text))
+    local virt_text = {}
+    table.insert(virt_text, { new_lines[1], "Comment" })
+
+    local virt_lines = {}
+    for i = 2, #new_lines do
+        table.insert(virt_lines, { { new_lines[i], "Comment" } })
+    end
 
     -- Clear the previous extmarks
     vim.api.nvim_buf_clear_namespace(P._preview_buffer, P._namespace, 0, -1)
@@ -436,11 +444,11 @@ function P.show_virtual_text()
     -- Get the cursor position of the main buffer
     local line, col = unpack(vim.api.nvim_win_get_cursor(P._preview_window))
 
-    vim.api.nvim_buf_set_extmark(P._preview_buffer, P._namespace, line - 1 , col, {
-        virt_text = lines,
+    vim.api.nvim_buf_set_extmark(P._preview_buffer, P._namespace, line - 1, col, {
+        virt_text = virt_text,
         virt_text_pos = "inline",
+        virt_lines = virt_lines,
     })
-
 end
 
 ---@private
