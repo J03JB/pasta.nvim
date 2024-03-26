@@ -236,9 +236,9 @@ function P._create_window()
         relative = "cursor",
         style = "minimal",
         anchor = "NW",
-        hide = true,
+        -- hide = true,
         -- width = window_width,
-        width = 100,
+        width = 69,
         height = window_height,
         row = 1,
         col = 0,
@@ -274,6 +274,9 @@ function P._create_window()
 
     -- Highlight the cursor line
     vim.wo[P._window].cursorline = true
+
+    -- Make the window transparent
+    vim.wo[P._window].winblend = 70
 
     -- Add the colors
     P._define_highlights()
