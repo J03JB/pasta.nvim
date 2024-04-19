@@ -231,17 +231,15 @@ function P._create_window()
     local window_height = #P._register_values
 
     -- Create the floating window
-    -- TODO: window covers the virtual text atm! (fix me)
     local window_options = {
-        relative = "cursor",
+        relative = "win",
         style = "minimal",
-        anchor = "NW",
-        -- hide = true,
+        anchor = "NE",
         -- width = window_width,
         width = 69,
         height = window_height,
         row = 1,
-        col = 0,
+        col = vim.api.nvim_win_get_width(0)-1,
         border = "rounded",
         title = "Pasta.nvim",
         title_pos = "center",
@@ -276,7 +274,7 @@ function P._create_window()
     vim.wo[P._window].cursorline = true
 
     -- Make the window transparent
-    vim.wo[P._window].winblend = 70
+    -- vim.wo[P._window].winblend = 0
 
     -- Add the colors
     P._define_highlights()
@@ -290,7 +288,7 @@ function P._create_window()
     -- Ensure the window shows up
     vim.cmd("redraw!")
 
-    -- -- Put the window in normal mode when using a visual selection
+    -- Put the window in normal mode when using a visual selection
     if P._previous_mode_is_visual() then
         vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-N>", true, true, true), "n", true)
     end
