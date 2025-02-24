@@ -1,3 +1,5 @@
+-- TODO: Set up config for user settings
+
 ---@class P
 ---@field private _register_values { regcontents: string, line: string, register: string, type_symbol?: string, regtype: string }[]
 ---@field private _empty_registers string[]
@@ -237,7 +239,8 @@ function P._create_window()
         anchor = "NE",
         -- width = window_width,
         width = 69,
-        height = window_height,
+        -- height = window_height,
+        height = 10,
         row = 1,
         col = vim.api.nvim_win_get_width(0)-1,
         border = "rounded",
