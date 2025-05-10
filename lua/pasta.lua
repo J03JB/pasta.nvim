@@ -30,6 +30,17 @@ local P = {}
 ---| '"paste"' # Insert the register's contents by pretending a pasting action, similar to pressing "*reg*p, cannot be used in insert mode.
 ---| '"motion"' # Create a motion from the register, similar to pressing "*reg* (without pasting it yet).
 
+---@alias VimKeymapMode
+---| '"n"'    # Normal mode
+---| '"v"'    # Visual mode (covers Visual and Select)
+---| '"s"'    # Select mode
+---| '"x"'    # Visual mode (explicitly Visual block mode if preceeded by CTRL-V)
+---| '"o"'    # Operator-pending mode
+---| '"i"'    # Insert mode
+---| '"c"'    # Command-line mode
+---| '"t"'    # Terminal mode
+---| '""'     # Normal, Visual, Select, and Operator-pending mode
+
 ---@class sign_highlights_options
 ---@field cursorline? string Highlight group for when the cursor is over the line. Default is `"Visual"`.
 ---@field selection? string Highlight group for the selection registers, `*+`. Default is `"Constant"`.
@@ -64,21 +75,20 @@ P.sign_highlights = {
 }
 ---@usage 'require("Pasta").setup({})'
 function P.setup()
-    -- register ":Pasta" user command
     vim.api.nvim_create_user_command("Pasta", P.show_window({ mode = "paste" }), {})
 
-    -- Pre-fill the key mappings
     P._fill_mappings()
 
     P._bind_global_key("normal", '"', "n")
     P._bind_global_key("visual", '"', "x")
     P._bind_global_key("insert", "<C-R>", "i")
 
-    -- create namespace for highlighting and signs
-    P._namespace = vim.api.nvim_create_namespace("registers")
+    P._namespace = vim.api.nvim_create_namespace("pasta")
 end
 
 ---@mod callbacks Bindable functions
+
+-- TODO: Fix string matching warning P_mode... 
 
 ---Handle the calling of the callback function based on the options, so things like delays can be added.
 ---@param options? callback_options Options to apply to the callback function.
@@ -87,24 +97,18 @@ end
 ---@nodiscard
 function P._handle_callback_options(options, cb)
     local if_mode = (options and options.if_mode) or { "paste", "insert", "motion" }
-    -- Process the table arguments
-    -- Ensure it's always a table
     if type(if_mode) ~= "table" then
         if_mode = { if_mode }
     end
     local after = (options and options.after) or function() end
 
-    -- Create the callback that's called with all checks and events
     local full_cb = function(...)
-        -- Do nothing if we are not in the proper mode
         if not vim.tbl_contains(if_mode, P._mode) then
             return
         end
 
-        -- Call the original callback
         cb(...)
 
-        -- If we need to call a function after the callback also call that
         after()
     end
 
@@ -239,8 +243,8 @@ function P._create_window()
         anchor = "NE",
         -- width = window_width,
         width = 69,
-        -- height = window_height,
-        height = 10,
+        height = window_height,
+        -- height = 10,
         row = 1,
         col = vim.api.nvim_win_get_width(0)-1,
         border = "rounded",
@@ -456,7 +460,7 @@ end
 ---@private
 ---Get the register information matching the register.
 ---@param register? string Register to look up, if nothing is passed the current line will be used
----@return? table Register information from `registers._register_values`
+---@return table? Register? information from `registers._register_values`
 function P._register_info(register)
     if register == nil then
         -- A register is selected by the cursor, get it based on the current line
@@ -477,7 +481,7 @@ end
 
 ---@class callback_options
 ---@field after? function Callback function that can be chained after the current one.
----@field if_mode P_mode|[register_mode] Will only be triggered when the registers mode matches it. Default: `{ "paste", "insert", "motion" }`.
+---@field if_mode VimKeymapMode|[P_mode] Will only be triggered when the registers mode matches it. Default: `{ "paste", "insert", "motion" }`.
 ---Close the window.
 ---@param options? callback_options Options for firing the callback.
 ---@return function callback Function that can be used to pass to configuration options with callbacks.
@@ -500,7 +504,7 @@ function P.apply_register(options)
     return P._handle_callback_options(options --[[@as callback_options]], function(register, mode)
         -- When the current line needs to be selected a window also needs to be open
         if register == nil and P._window == nil then
-            vim.api.nvim_err_writeln("registers window isn't open, can't apply register")
+            vim.api.nvim_echo({"registers window isn't open, can't apply register"}, true, {})
             return
         end
 
@@ -584,14 +588,14 @@ function P._apply_register(register, keep_open_until_keypress)
     if vim.fn.has("clipboard") == 1 then
         vim.cmd("let @+=@" .. register)
     else
-        vim.api.nvim_err_writeln("No clipboard available")
+        vim.api.nvim_echo({"No clipboard available"}, true, {})
     end
 end
 
 ---@private
 ---Get the register or when it's `nil` the selected register from the cursor.
 ---@param register? string Register to look up, if nothing is passed the current line will be used
----@return? string The register or the current line, if applicable
+---@return  string? register The register or the current line, if applicable
 ---@nodiscard
 function P._register_symbol(register)
     if register == nil then
@@ -766,7 +770,7 @@ end
 ---@param register string The register to move to, if it can't be found nothing is done.
 function P._move_cursor_to_register(register)
     if P._window == nil then
-        vim.api.nvim_err_writeln("registers window isn't open, can't move cursor")
+        vim.api.nvim_echo({"registers window isn't open, can't move cursor"}, true, {})
         return
     end
 
@@ -827,14 +831,14 @@ end
 ---@private
 ---Whether a key should be bound.
 ---@param option string Which item from bind_keys should be checked
----@return boolean Whether the key should be bound
+---@return boolean? Whether the key should be bound
 ---@nodiscard
 function P._key_should_be_bound(option)
     if type(P.bind_keys) == "boolean" then
         vim.print(P.bind_keys)
         return P.bind_keys --[[@as boolean]]
     else
-        return P.bind_keys[option]
+        return P.bind_keys[option] --[[@as boolean]]
     end
 end
 
@@ -842,7 +846,7 @@ end
 ---Create a map for global key binding with a callback function.
 ---@param index string Key of the function in the `bind_keys` table.
 ---@param key string Which key to press.
----@param mode P_mode Which mode to register the key.
+---@param mode VimKeymapMode Which mode to register the key.
 function P._bind_global_key(index, key, mode)
     if P._key_should_be_bound(index) then
         vim.api.nvim_set_keymap(mode, key, "", {

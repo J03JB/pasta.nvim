@@ -1,103 +1,186 @@
-<h1 align="center">✨ My Awesome Plugin ✨</h1>
+# Pasta.nvim
 
-<p align="center">
-  <a href="https://github.com/S1M0N38/my-awesome-plugin.nvim/actions/workflows/test.yml">
-    <img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/S1M0N38/my-awesome-plugin.nvim/test.yml?style=for-the-badge&label=Tests"/>
-  </a>
-  <a href="https://github.com/S1M0N38/my-awesome-plugin.nvim/actions/workflows/docs.yml">
-    <img alt="Docs" src="https://img.shields.io/github/actions/workflow/status/S1M0N38/my-awesome-plugin.nvim/docs.yml?style=for-the-badge&label=Docs"/>
-  </a>
-  <a href="https://github.com/S1M0N38/my-awesome-plugin.nvim/releases">
-    <img alt="Release" src="https://img.shields.io/github/v/release/S1M0N38/my-awesome-plugin.nvim?style=for-the-badge"/>
-  </a>
-</p>
+**Pasta.nvim** is a Neovim plugin that provides an enhanced visual interface for interacting with your editor registers. It allows you to easily view, select, and apply register contents in various modes.
 
-______________________________________________________________________
+![image](assets/pasta_nvim_screenshot.png)
 
-A simple way to kickstart your Neovim plugin development like a pro with:
+## ✨ Features
 
-- [Plugin Structure](#plugin-structure)
-- [Tests](#tests)
-- [Docs Generation](#docs-generation)
-- [Linting and Formatting](#linting-and-formatting)
-- [Deployment](#deployment)
+- **Visual Register Listing:** Displays all populated registers in a floating window.
+- **Intuitive Selection:** Easily navigate and select registers using standard Neovim motions (by default, or configure as needed).
+- **Multiple Application Modes:**
+  - **Insert Mode:** Pastes the register content directly, similar to `<C-R><reg>`.
+  - **Paste Mode:** Applies the register content as a paste operation (e.g., `p`, `P`), suitable for normal or visual mode.
+  - **Motion Mode:** Uses the selected register for a motion (e.g., `"<reg>d`, `"<reg>y`), useful when you want to specify the register before an operator.
+- **Live Preview:** Shows a preview of the highlighted register's content as virtual text in the buffer where the plugin was invoked.
+- **Customizable Keybindings:**
+  - Define global keybindings to open the Pasta window.
+  - Customize keybindings within the Pasta window for actions like applying a register, closing the window, etc.
+- **Syntax Highlighting:**
+  - Highlights special characters (newlines, tabs) within register previews for better readability.
+  - Differentiates register types (e.g., selection, default, named, history) with distinct highlight groups, all configurable.
+- **User Command:** `:Pasta` command to open the register window (defaults to "paste" mode).
+- **Informative Footer:** Displays empty registers.
 
-**Usage**:
+## ⚡️ Requirements
 
-1. On the top right of this page, click on `Use this template` > `Create a new repository`.
-1. Clone your new repo and `cd` into it.
-1. Kickstart with
+- Neovim (0.11+ recommended).
 
-```sh
-make init name=the_name_of_your_plugin
+## 💾 Installation
+
+You can install Pasta.nvim using your favorite plugin manager.
+
+**lazy.nvim:**
+
+```lua
+
+{
+  'J03JB/pasta.nvim',
+  config = function()
+    require('pasta').setup({})
+  end,
+}
 ```
 
-Then, modify the `README.md`, `.github/workflows/release.yml`, and `LICENSE` files to your liking.
+🚀 Usage
 
-## 📁 Plugin Structure
+Pasta.nvim aims to be intuitive. Once installed and set up, you can open the register window using the default keybindings (or your custom ones).
 
-- `plugin/my_awesome_plugin.lua` - *the main file, the one loaded by the plugin manager*
+Default Global Keybindings:
 
-- `lua/my_awesome_plugin/`
+    " in Normal Mode: Opens the Pasta window, configured to paste the selected register's content (like "<reg>p).
+    " in Visual Mode: Opens the Pasta window, configured to use the selected register for a motion (e.g., to yank the visual selection into the chosen register "<reg>y).
+    <C-R> in Insert Mode: Opens the Pasta window, configured to insert the selected register's content.
 
-  - `init.lua` - *the main file of the plugin, the one loaded by `plugin/my_awesome_plugin.lua`*
-  - `math.lua` - *an example module, here we define simple math functions*
-  - `config.lua` - *store plugin default options and extend them with user's ones*
+Command:
 
-- `tests/my_awesome_plugin/`
+    :Pasta: Opens the Pasta window in "paste" mode.
 
-  - `my_awesome_plugin_spec.lua` - *plugin tests. Add other `*_spec.lua` files here for further testing*
+Inside the Pasta Window:
 
-- `scripts/`
+    Navigation: Use j, k (or arrow keys) to move up and down the list of registers.
+    Selection & Application:
+        Pressing the key corresponding to a register (e.g., a, 0, *) will apply that register based on the mode Pasta was opened in.
+        Pressing <CR> (Enter) on a highlighted register will apply it.
+    Closing:
+        Pressing <Esc> closes the Pasta window.
 
-  - `docs.lua` - *Lua script to auto-generate `doc/my_awesome_plugin.txt` docs file from code annotations*
-  - `minimal_init.lua` - *start Neovim instances with minimal plugin configuration. Used in `Makefile`*
+As you move the cursor in the Pasta window, a preview of the highlighted register's content will appear as virtual text at your cursor position in the original buffer.
+⚙️ Configuration
 
-- `Makefile` - *script for launching **tests**, **linting**, and docs generation*
+You can customize Pasta.nvim by passing a configuration table to the setup() function.
+Lua
 
-The other files are not important and will be mentioned in the following sections.
+require('pasta').setup({
+-- Global keybindings to open the Pasta window
+bind_keys = {
+normal = function() require('pasta').show_window({ mode = "paste" }) end, -- Default: paste mode
+visual = function() require('pasta').show_window({ mode = "motion" }) end,
+insert = function() require('pasta').show_window({ mode = "insert" }) end,
+-- Disable a binding
+-- visual = false,
 
-## 🧪 Tests
+    -- Keybindings within the Pasta window
+    registers = function(register, mode) require('pasta').apply_register() end, -- Action for pressing a register key (e.g., 'a', '0')
+    ["<CR>"] = function(register, mode) require('pasta').apply_register() end,  -- Action for <CR>
+    ["<Esc>"] = function(register, mode) require('pasta').close_window() end,   -- Action for <Esc>
 
-Tests are run using [plenary.nvim](https://github.com/nvim-lua/plenary.nvim), a Lua library for Neovim plugin development. [Here](https://github.com/nvim-lua/plenary.nvim/blob/master/TESTS_README.md) is how to write tests using plenary.
+    -- Add custom keybindings for the Pasta window
+    -- ["<C-d>"] = function() print("Debug!") end,
+    -- ["d"] = function(register, mode)
+    --   -- Custom action for pressing 'd' in the pasta window
+    --   -- For example, delete the register content (you'd need to implement P.delete_register)
+    --   -- require('pasta').delete_register(nil, mode)
+    --   -- then close
+    --   require('pasta').close_window()
+    -- end,
 
-To run the tests on your local machine for local development, you can:
+    -- Note: Deprecated keys like 'return_key', 'escape', 'ctrl_n', etc. are handled by
+    -- directly mapping keys like "<CR>", "<Esc>" as shown above.
+    -- The default bindings for <C-n>, <C-p>, <C-j>, <C-k>, <Del>, <BS> are commented out
+    -- in the plugin's internal defaults but can be re-enabled here if desired,
+    -- pointing them to appropriate functions (e.g., P.move_cursor_down(), P.clear_highlighted_register() -
+    -- these specific functions would need to be exposed or re-implemented if you want them).
 
-- Have the plenary plugin in your Neovim configuration and use `:PlenaryBustedDirectory tests`.
-- Have the plenary repo cloned in the same directory as the my_awesome_plugin repo and use `make test`.
+},
 
-When running tests on CI, plenary.nvim is cloned, and the tests are run using `make test`.
+-- Customize highlight groups for register types in the Pasta window
+sign*highlights = {
+cursorline = "Visual", -- Highlight for the cursor line in Pasta window
+selection = "Constant", -- For `*`, `+` registers
+default = "Function", -- For `"` register
+unnamed = "Statement", -- For `\` register (if used/shown, typically `"` is the unnamed)
+read_only = "Type", -- For `:.%` registers
+alternate_buffer = "Operator",-- For `#` register
+expression = "Exception", -- For `=` register
+black_hole = "Error", -- For `*`register
+    last_search = "Tag",          -- For`/`register
+    delete = "Special",           -- For`-`register (small delete)
+    yank = "Delimiter",           -- For`0`register (yank register)
+    history = "Number",           -- For`1-9`registers (numbered history)
+    named = "Todo",               -- For`a-z` registers (named registers)
 
-## 📚 Docs Generation
+    -- Internal highlights (usually don't need changing unless your colorscheme has issues)
+    cursorlinesign = "CursorLine",
+    signcolumn = "SignColumn",
 
-In the Vim/Neovim world, it's customary to provide documentation in the Vim style, a txt file with tags and sections that can be navigated using the `:help` command.
-In Lua, we can add annotations to our code, i.e., comments starting with `---`, so that we can have the full signature of functions and modules for LSP sorcery. [Here](https://github.com/tjdevries/tree-sitter-lua/blob/master/HOWTO.md) is how to write code annotations.
+}
+})
 
-Lua code annotations can be used to generate the Vim style docs using the `docgen` module from [tree-sitter-lua](https://github.com/tjdevries/tree-sitter-lua). This is an alternative tree-sitter parser, so it's not installed by the tree-sitter plugin. To generate the docs locally, you must clone the tree-sitter-lua repo in the same directory as the my_awesome_plugin repo and use `make docs`.
+bind_keys Options
 
-When running docs generation on CI, tree-sitter-lua is cloned, and the docs are generated using `make docs`.
+The bind_keys table allows you to customize how Pasta.nvim is invoked and how you interact with its window.
 
-## 🧹 Linting and Formatting
+    normal: (Function | false) Function to map to " in normal mode. Set to false to disable.
+        Default: require('pasta').show_window({ mode = "paste" })
+    visual: (Function | false) Function to map to " in visual mode. Set to false to disable.
+        Default: require('pasta').show_window({ mode = "motion" })
+    insert: (Function | false) Function to map to <C-R> in insert mode. Set to false to disable.
+        Default: require('pasta').show_window({ mode = "insert" })
+    registers: (Function) Function to call when a register key (e.g., a, 0, *) is pressed in the Pasta window.
+        Receives register: string, mode: P_mode as arguments.
+        Default: require('pasta').apply_register()
+    <key>: (Function | false) You can add any other key (e.g., "<CR>", "<Esc>", "<C-j>") and assign a function to it for custom behavior within the Pasta window.
+        The function will receive register: string (the currently selected register symbol, or nil if none relevant) and mode: P_mode (the mode Pasta was opened with).
+        Example: ["<Esc>"] = require('pasta').close_window()
 
-Linting highlights code that is syntactically correct but may not be the best practice and can lead to bugs or errors.
-Formatting is the process of transforming code into a standardized format that makes it easier to read and understand.
+sign_highlights Options
 
-- [Luacheck](https://github.com/mpeterv/luacheck) is run by `make lint` using the configuration in the `.luacheckrc` file.
-- In CI, [Stylua](https://github.com/JohnnyMorganz/StyLua) is run after linting using the configuration in the `.stylua.toml` file.
+This table maps logical register categories to Neovim highlight groups. You can change these to better fit your colorscheme. Refer to :help highlight-groups for standard Neovim highlight groups.
+P_mode (Pasta Modes)
 
-## 🚀 Deployment
+When calling show_window or defining actions, you specify a P_mode:
 
-[Tags](https://git-scm.com/book/en/v2/Git-Basics-Tagging) are how Git marks milestones in the commit history of a repository.
-Tags can be used to trigger releases, i.e., publish a specific version of the plugin on GitHub and LuaRocks.
+    "insert": Inserts the register's contents directly, like <C-R><reg> in insert mode.
+    "paste": Applies the register's contents as a paste operation (e.g., p or P). This is useful in normal or visual modes.
+    "motion": Uses the selected register for a motion. For example, if you open Pasta in "motion" mode, select register a, then after Pasta closes, typing d would effectively be "ad.
 
-- A new release on GitHub is automatically created when a new tag is pushed.
-- A new release on LuaRocks is automatically created when a new tag is pushed. It requires adding `LUAROCKS_API_KEY` as a secret in the repo settings.
+🛠️ API
 
-## 👏 Acknowledgments
+Pasta.nvim exposes a few functions that can be used in your custom keybindings or for more advanced integrations:
 
-Neovim is growing a nice ecosystem, but some parts of plugin development are sometimes obscure. This template is an attempt to put together best practices by copying:
+    require('pasta').show_window(options)
+        Opens the Pasta window.
+        options: A table, e.g., { mode = "insert" | "paste" | "motion" }.
+    require('pasta').apply_register(options)
+        Applies the currently selected register (or a specified one).
+        options: A table, can include:
+            mode: P_mode to override the mode Pasta was opened with.
+            keep_open_until_keypress: boolean, if true and in "motion" mode, keeps the window open until another key is pressed (e.g., for "<reg>d the d would be the key).
+        Typically used as a callback.
+    require('pasta').close_window(options)
+        Closes the Pasta window.
+        options: (Optional) Can include after (a callback function) or if_mode (to only close if in a specific mode).
+        Typically used as a callback.
 
-- [ellisonleao/nvim-plugin-template](https://github.com/ellisonleao/nvim-plugin-template) - *Plugin Structure*
-- [nvim-telescope/telescope.nvim](https://github.com/nvim-telescope/telescope.nvim) - *Tests, lint, docs generation*
+Refer to the source code for detailed arguments and behaviors of these functions.
 
-I highly suggest [this video tutorial](https://youtu.be/n4Lp4cV8YR0?si=lHlxQBNvbTcXPhVY) by [TJ DeVries](https://github.com/tjdevries), a walkthrough of the Neovim plugin development process.
+TODO
+   -  User settings for window dimensions, position, border style.
+   -  Option to show/hide empty registers or filter registers.
+   -  More robust handling for clear_highlighted_register (if re-enabled by user).
+   -  Consider if move_cursor_down/up functions should be part of the public API for custom keybindings.
+
+📜 License
+
+This plugin is licensed under the MIT License. See the LICENSE file for details.
